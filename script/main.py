@@ -238,7 +238,7 @@ def btn4_click():
 if __name__ == '__main__':
     # とりあえずデバッグ用に作っただけです。GUIをオフにして実行する用です。
     # GUI実行時はFalseにしてください。
-    debug = True
+    debug = False
 
     # 実行時の引数はこのように明示的に指定しましょう（分からなかったらまた聞いてください）
     parser = argparse.ArgumentParser(description='Wav file choice.')
