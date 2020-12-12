@@ -243,7 +243,6 @@ if __name__ == '__main__':
     # 実行時の引数はこのように明示的に指定しましょう（分からなかったらまた聞いてください）
     parser = argparse.ArgumentParser(description='Wav file choice.')
     path_default = "yukkuri.wav"
-    # path_default = "VOICEACTRESS100_091.wav"
     parser.add_argument('--path', type=str, help='Select WAV path', default=path_default)
     argv = parser.parse_args()
     path = argv.path
