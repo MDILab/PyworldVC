@@ -9,51 +9,74 @@ import pyaudio
 import pyworld as pw
 
 
-# ファイル保存
 def wavWrite(filename, data, channels, fs):
+    """ファイル保存
+    """
     binaryData = struct.pack("h" * len(data), *data)
     out = wave.Wave_write(filename)
     # "lowpass.wav","highpass.wav","bandpass.wav","VC1_test.wav"
     param = (channels, 2, fs, len(binaryData), 'NONE', 'not compressed')
     out.setparams(param)
     out.writeframes(binaryData)
-    out.close
+    out.close()
 
 
-# ファイル読み込み
 def wavRead(filename):
-    wf = wave.open(filename, "r")
-    channels = wf.getnchannels()
-    fs = wf.getframerate()
+    """ファイル読み込み
 
-    buf = wf.readframes(wf.getnframes())
+    :param filename: ファイルパス
+    :return: data, channels, fs
+    """
+    with wave.open(filename, "r") as wf:
+        channels = wf.getnchannels()
+        fs = wf.getframerate()
+
+        buf = wf.readframes(wf.getnframes())
+
+    # wf = wave.open(filename, "r")
+    # channels = wf.getnchannels()
+    # fs = wf.getframerate()
+    #
+    # buf = wf.readframes(wf.getnframes())
     data = np.frombuffer(buf, dtype="int16").astype(np.float)
     return data, channels, fs
 
 
 # WORLDの特徴量推定部分をファイル読み込みから分離しましょう。
-def world_analysis(data, fs):
-    _f0, _time4 = pw.dio(data, fs)  # 基本周波数の抽出
-    f0 = pw.stonemask(data, _f0, _time4, fs)  # 基本周波数の修正
+def world_analysis(data_in: np.ndarray, fs_in: int):
+    """WORLD特徴量の推定
 
-    sp = pw.cheaptrick(data, f0, _time4, fs)  # スペクトル包絡の抽出
-    ap = pw.d4c(data, f0, _time4, fs)  # 非周期性指標の抽出
+    :param data_in: 音声信号
+    :param fs_in: サンプリングレート
+    :return: f0, sp, ap
+    """
+    f_data = data_in.astype(np.float64)  # 念のためキャスト
+
+    _f0, _time = pw.dio(f_data, fs_in)  # 基本周波数の抽出
+    f0 = pw.stonemask(f_data, _f0, _time, fs_in)  # 基本周波数の修正
+
+    sp = pw.cheaptrick(f_data, f0, _time, fs_in)  # スペクトル包絡の抽出
+    ap = pw.d4c(f_data, f0, _time, fs_in)  # 非周期性指標の抽出
     return f0, sp, ap
 
 
-# sinc関数
 def sinc(x):
+    """sinc関数
+    """
     if x == 0.0:
         return 1.0
     else:
         return np.sin(x) / x
 
 
-# フィルタ計数bの決定(ローパスフィルタ)
-# fs:サンプリング周波数
-# cutoff:カットオフ周波数
-# delta:遷移帯域幅
-def lpf(fs, cutoff, delta):
+def lpf(fs, cutoff, delta) -> np.ndarray:
+    """フィルタ計数bの決定(ローパスフィルタ)
+
+    :param fs: サンプリング周波数
+    :param cutoff: カットオフ周波数
+    :param delta: 遷移帯域幅
+    :return: フィルタ係数
+    """
     cutoff = float(cutoff) / fs  # カットオフ周波数の正規化
     delta = float(delta) / fs  # 遷移帯域幅の正規化
 
@@ -78,11 +101,14 @@ def lpf(fs, cutoff, delta):
     return b
 
 
-####### フィルタ係数bの決定（ハイパスフィルタ）
-# fs, サンプリング周波数
-# cutoff, カットオフ周波数
-# delta, 遷移帯域幅
-def hpf(fs, cutoff, delta):
+def hpf(fs, cutoff, delta) -> np.ndarray:
+    """フィルタ係数bの決定（ハイパスフィルタ）
+
+    :param fs: サンプリング周波数
+    :param cutoff: カットオフ周波数
+    :param delta: 遷移帯域幅
+    :return: フィルタ係数b
+    """
     cutoff = float(cutoff) / fs  # カットオフ周波数の正規化
     delta = float(delta) / fs  # 遷移帯域幅の正規化
 
@@ -107,12 +133,15 @@ def hpf(fs, cutoff, delta):
     return b
 
 
-####### フィルタ係数bの決定（バンドパスフィルタ）
-# fs, サンプリング周波数
-# cutoff1, カットオフ周波数(下限)
-# cutoff2, カットオフ周波数（上限）
-# delta, 遷移帯域幅
-def bpf(fs, cutoff1, cutoff2, delta):
+def bpf(fs, cutoff1, cutoff2, delta) -> np.ndarray:
+    """フィルタ係数bの決定（バンドパスフィルタ）
+
+    :param fs: サンプリング周波数
+    :param cutoff1: カットオフ周波数(下限)
+    :param cutoff2: カットオフ周波数（上限）
+    :param delta: 遷移帯域幅
+    :return: フィルタ係数b
+    """
     cutoff1 = float(cutoff1) / fs  # カットオフ周波数の正規化
     cutoff2 = float(cutoff2) / fs  # カットオフ周波数の正規化
     delta = float(delta) / fs  # 遷移帯域幅の正規化
@@ -141,7 +170,14 @@ def bpf(fs, cutoff1, cutoff2, delta):
 # clickイベント
 # 以下のように書くとボタン1～3をまとめられます。
 # ここの処理はデコレータというものを用いているので、調べてみれば詳しい挙動が分かると思います。
+# 簡単に言うと関数を返す関数です。
 def deco_btn_click(file_path: str):
+    """イベントハンドラ生成関数
+
+    :param file_path: 再生するファイルのパス
+    :return: イベントハンドラ
+    """
+
     def btn_click():
         chunk = 1024
 
@@ -207,6 +243,7 @@ if __name__ == '__main__':
     # 実行時の引数はこのように明示的に指定しましょう（分からなかったらまた聞いてください）
     parser = argparse.ArgumentParser(description='Wav file choice.')
     path_default = "yukkuri.wav"
+    # path_default = "VOICEACTRESS100_091.wav"
     parser.add_argument('--path', type=str, help='Select WAV path', default=path_default)
     argv = parser.parse_args()
     path = argv.path
@@ -243,10 +280,17 @@ if __name__ == '__main__':
     ##########################
     # WORLDでVC処理をする部分
     ##########################
-    f0, ap, sp = world_analysis(data, fs)
+    data_max = data.max()
+    data_min = data.min()
+    norm_data = (data - data_min) / (data_max - data_min)
+    # norm_data = data / 8000.0
+
+    f0, ap, sp = world_analysis(norm_data, fs)
     modified_f0 = 2.0 * f0  # ピッチシフト
     out4 = pw.synthesize(modified_f0, sp, ap, fs)
 
+    # out4 = (out4 * (data_max - data_min) + data_min)
+    out4 *= 8000.0
     wavWrite("VC1_test.wav", out4.astype(np.int16), channels, fs)
 
     if not debug:
