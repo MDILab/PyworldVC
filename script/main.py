@@ -27,17 +27,12 @@ def wavRead(filename):
     :param filename: ファイルパス
     :return: data, channels, fs
     """
+    # openしたらcloseが必要になるので、忘れないようにwith文を使いましょう。
     with wave.open(filename, "r") as wf:
         channels = wf.getnchannels()
         fs = wf.getframerate()
 
         buf = wf.readframes(wf.getnframes())
-
-    # wf = wave.open(filename, "r")
-    # channels = wf.getnchannels()
-    # fs = wf.getframerate()
-    #
-    # buf = wf.readframes(wf.getnframes())
     data = np.frombuffer(buf, dtype="int16").astype(np.float)
     return data, channels, fs
 
@@ -146,22 +141,22 @@ def bpf(fs, cutoff1, cutoff2, delta) -> np.ndarray:
     cutoff2 = float(cutoff2) / fs  # カットオフ周波数の正規化
     delta = float(delta) / fs  # 遷移帯域幅の正規化
 
-    # タップ数（フィルタ係数J+1の数）J+1は奇数になるように
-    J = round(3.1 / delta) - 1
-    if (J + 1) % 2 == 0:
-        J += 1
-    J = int(J)
+    # タップ数（フィルタ係数J+1の数）j+1は奇数になるように
+    j = round(3.1 / delta) - 1
+    if (j + 1) % 2 == 0:
+        j += 1
+    j = int(j)
 
     # タップ数の確認（遷移帯域幅と反比例）
-    print("filter coefficients: " + str(J + 1))
+    print("filter coefficients: " + str(j + 1))
 
     # フィルタ係数の計算
     b = []
-    for m in range(int(-J / 2), int(J / 2 + 1)):
+    for m in range(int(-j / 2), int(j / 2 + 1)):
         b.append(2.0 * cutoff2 * sinc(2.0 * np.pi * cutoff2 * m) - 2.0 * cutoff1 * sinc(2.0 * np.pi * cutoff1 * m))
 
     # ハニング窓関数をかける（窓関数法）
-    hanningWindow = np.hanning(J + 1)
+    hanningWindow = np.hanning(j + 1)
     b = b * hanningWindow
 
     return b
