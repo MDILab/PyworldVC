@@ -38,13 +38,12 @@ def wav_write(filename, data, channels, fs):
     """ファイル保存
     """
     binaryData = struct.pack("h" * len(data), *data)
-    # out = wave.Wave_write(filename)
+    # openしたらcloseが必要になるので、忘れないようにwith文を使いましょう。
     with wave.Wave_write(filename) as out:
         # "lowpass.wav","highpass.wav","bandpass.wav","VC1_test.wav"
         param = (channels, 2, fs, len(binaryData), 'NONE', 'not compressed')
         out.setparams(param)
         out.writeframes(binaryData)
-    # out.close()
 
 
 def wav_read(filename):
@@ -65,7 +64,7 @@ def wav_read(filename):
 
 if __name__ == '__main__':
     # デバッグで使ったやつ（Falseで元のコードが動きます）
-    debug = True
+    debug = False
 
     # コマンドライン引数のパース（引数を変数に適宜代入する）
     parser = argparse.ArgumentParser(description='Wav file choice.')  # パーサーオブジェクトを作成
@@ -74,30 +73,28 @@ if __name__ == '__main__':
     argv = parser.parse_args()  # 実行時の引数を解析
     path = argv.path  # 解析した引数argv.pathをpathに代入
 
-    # 読み込み
+    # 読み込み→変換→書き出し
     if debug:
-        # Librosaを使うと楽なのでおすすめ
+        # Librosaで読み込み（楽なのでおすすめ）
         fs_, _ = read(path)  # サンプリングレートを算出するために一旦scipyで読み込み
         data, fs = librosa.load(path, sr=fs_, mono=True)  # Librosaでwavを読み込み
-        data = data.astype(np.float64)  # WORLDに対応させるようにキャスト
-        channels = 1  # モノラルに指定しているので1
-    else:
-        # 元のコードと同じ手順で読み込み
-        data, channels, fs = wav_read(path)
-
-    # WORLD変換
-    if debug:
-        f0, sp, ap = world_analysis_harvest(data, fs)  # 特徴量抽出（高SNR用）
-    else:
-        f0, sp, ap = world_analysis(data, fs)  # 特徴量抽出（元のコード）
-    modified_f0 = f0 * 2.0  # 基本周波数変換
-    out = pw.synthesize(modified_f0, sp, ap, fs)  # 音声再合成
-
-    # 書き出し
-    if debug:
+        # 特徴量抽出（高SNR用）
+        f0, sp, ap = world_analysis_harvest(data, fs)
+        # 基本周波数変換
+        modified_f0 = f0 * 2.0
+        # 音声再合成
+        out = pw.synthesize(modified_f0, sp, ap, fs)
         # soundfile書き出し（Librosa標準の方法）
         out_sf = out.astype(np.float32)  # soundfile書き出し用にキャスト
         soundfile.write("out_sf_" + path, out_sf, fs)  # 書き出し
     else:
+        # 元のコードと同じ手順で読み込み
+        data, channels, fs = wav_read(path)
+        # 特徴量抽出（元のコード）
+        f0, sp, ap = world_analysis(data, fs)
+        # 基本周波数変換
+        modified_f0 = f0 * 2.0
+        # 音声再合成
+        out = pw.synthesize(modified_f0, sp, ap, fs)
         # 元のコードと同じ手順で書き出し
         wav_write("out_org_" + path, out.astype(np.int16), channels, fs)
