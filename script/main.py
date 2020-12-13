@@ -258,9 +258,10 @@ if __name__ == '__main__':
     bpf_cutoff2 = 1000  # カットオフ周波数（上限） [Hz]
     bpf_delta = 100  # 遷移帯域幅 [Hz]
 
-    b_lpf = lpf(fs, lpf_cutoff, lpf_delta)  # フィルタ係数bの計算
-    b_hpf = hpf(fs, hpf_cutoff, hpf_delta)  # フィルタ係数bの計算
-    b_bpf = bpf(fs, bpf_cutoff1, bpf_cutoff2, bpf_delta)  # フィルタ係数bの計算
+    # フィルタ係数bの計算
+    b_lpf = lpf(fs, lpf_cutoff, lpf_delta)
+    b_hpf = hpf(fs, hpf_cutoff, hpf_delta)
+    b_bpf = bpf(fs, bpf_cutoff1, bpf_cutoff2, bpf_delta)
 
     # dataとbを畳み込み
     out = np.convolve(data, b_lpf, 'same')
@@ -274,17 +275,13 @@ if __name__ == '__main__':
     ##########################
     # WORLDでVC処理をする部分
     ##########################
-    data_max = data.max()
-    data_min = data.min()
-    norm_data = (data - data_min) / (data_max - data_min)
-    # norm_data = data / 8000.0
-
-    f0, ap, sp = world_analysis(norm_data, fs)
-    modified_f0 = 2.0 * f0  # ピッチシフト
+    # 特徴量抽出
+    f0, sp, ap = world_analysis(data, fs)
+    # 特徴量変換
+    modified_f0 = 2.0 * f0
+    # 音声再合成
     out4 = pw.synthesize(modified_f0, sp, ap, fs)
 
-    # out4 = (out4 * (data_max - data_min) + data_min)
-    out4 *= 8000.0
     wavWrite("VC1_test.wav", out4.astype(np.int16), channels, fs)
 
     if not debug:
